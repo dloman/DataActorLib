@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 2.6.2)
 SET(CMAKE_C_COMPILER /usr/local/bin/gcc)
 SET(CMAKE_CXX_COMPILER /usr/local/bin/g++)
 
-project(DataCopier)
+project(GuiStuff)
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}")
 
