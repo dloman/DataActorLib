@@ -1,2 +1,2 @@
-# DataActorLib
-lib for doing thingz automagically
+# GuiStuff
+lib for doing GUI thingz automagically (hopefully)
