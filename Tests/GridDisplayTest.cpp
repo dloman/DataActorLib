@@ -38,6 +38,7 @@ bool App::OnInit()
   pFrame->Show();
 
   dal::test::MotorCommand MotorCommand{1, 2, 3};
+
   pGridDisplayer->Set(MotorCommand);
 
   pGridDisplayer->Refresh();
