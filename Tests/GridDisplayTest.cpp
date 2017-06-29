@@ -27,19 +27,25 @@ bool App::OnInit()
   auto pGridDisplayer =
     new dal::GridDisplayer<dal::test::MotorCommand, dal::test::Position>(pFrame);
 
-  auto pMainOuterSizer = new wxBoxSizer(wxVERTICAL);
+  auto pMainSizer = new wxBoxSizer(wxHORIZONTAL);
 
-  auto pMainInnerSizer = new wxBoxSizer(wxHORIZONTAL);
+  pMainSizer->Add(pGridDisplayer, 1, wxEXPAND | wxALL, 5);
 
-  pMainInnerSizer->Add(pGridDisplayer, 1, wxEXPAND | wxALL, 5);
-
-  pMainOuterSizer->Add(pMainInnerSizer, 1, wxEXPAND | wxALL, 5);
-
-  pFrame->SetSizer(pMainOuterSizer);
+  pFrame->SetSizer(pMainSizer);
 
   pFrame->Layout();
 
   pFrame->Show();
 
+  dal::test::MotorCommand MotorCommand{1, 2, 3};
+  pGridDisplayer->Set(MotorCommand);
+
+  pGridDisplayer->Refresh();
+
+  dal::test::Position Position{4, 5, 6};
+
+  pGridDisplayer->Set(Position);
+
+  pGridDisplayer->Refresh();
   return true;
 }

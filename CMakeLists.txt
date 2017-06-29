@@ -7,19 +7,25 @@ project(DataCopier)
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}")
 
+################################################################################
+find_package(DanLib REQUIRED)
+
+include_directories(${DanLib_INCLUDE_DIR})
+################################################################################
 find_package(wxWidgets REQUIRED)
 
 include("${wxWidgets_USE_FILE}")
 
+################################################################################
 find_package(Boost COMPONENTS filesystem system REQUIRED)
 
-include(${Boost_INCLUDE_DIR})
+include_directories(${Boost_INCLUDE_DIR})
+################################################################################
 
 include_directories(.)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1z")
 
-message("wxdwidsfdgrt ${wxWidgets_LIBRARIES}")
 add_executable(
   GridDisplayerTest
   WIN32

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <TypeTraits/TypeTraits.hpp>
 #include <wx/dataview.h>
 #include <wx/grid.h>
 #include <wx/frame.h>
@@ -9,6 +10,7 @@
 
 #include <boost/hana.hpp>
 #include <boost/type_index.hpp>
+#include <type_traits>
 #include <iostream>
 #include <locale>
 
@@ -18,6 +20,8 @@ namespace dal
 {
   namespace
   {
+    //--------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     void ConvertCamelCaseToSpaces(std::string& name)
     {
       for (size_t i = 1; i < name.size(); ++i)
@@ -30,6 +34,8 @@ namespace dal
       }
     }
 
+    //--------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
     void RemoveNamespace(std::string& name)
     {
       auto iName = name.rfind("::");
@@ -42,7 +48,9 @@ namespace dal
       ConvertCamelCaseToSpaces(name);
     }
 
-    template<typename PacketType>
+    //--------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
+    template <typename PacketType>
     void AddGridLabels(wxGrid* pGrid, PacketType packet)
     {
       namespace hana = boost::hana;
@@ -52,7 +60,7 @@ namespace dal
         labels.emplace_back(hana::to<const char*>(hana::first(pair)));
       });
 
-      pGrid->CreateGrid(labels.size(), 1);
+      pGrid->CreateGrid(1, labels.size());
       for (auto i = 0u; i < labels.size(); ++i)
       {
         //remove 'm' prefix
@@ -62,20 +70,43 @@ namespace dal
         }
 
         ConvertCamelCaseToSpaces(labels[i]);
-        pGrid->SetRowLabelValue(i, labels[i]);
-        pGrid->AutoSizeRowLabelSize(i);
+        pGrid->SetColLabelValue(i, labels[i]);
+        pGrid->AutoSizeColLabelSize(i);
       }
     }
 
-    template<std::size_t Index = 0, typename TupleType>
-      typename std::enable_if_t<Index == std::tuple_size<TupleType>::value>
-      AddPages(wxNotebook* pNotebook, const TupleType& tuple)
+    //--------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
+    template <typename PacketType>
+    void AddGridValues(wxGrid* pGrid, PacketType packet)
+    {
+      namespace hana = boost::hana;
+      std::vector<std::string> labels;
+      hana::for_each(packet, [&labels, pGrid, i = 0] (auto pair) mutable
       {
-      }
+        pGrid->SetCellValue(0, i++, std::to_string(hana::second(pair)));
+      });
+    }
 
-    template<std::size_t Index = 0, typename TupleType>
-      typename std::enable_if_t<Index != std::tuple_size<TupleType>::value>
-      AddPages(wxNotebook* pNotebook, const TupleType& tuple)
+    //--------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
+    template<std::size_t Index = 0, typename GridArrayType, typename TupleType>
+    typename std::enable_if_t<Index == std::tuple_size_v<TupleType>>
+      AddPages(
+        wxNotebook* pNotebook,
+        GridArrayType& gridArray,
+        const TupleType& tuple)
+    {
+    }
+
+    //--------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
+    template<std::size_t Index = 0, typename GridArrayType, typename TupleType>
+    typename std::enable_if_t<Index != std::tuple_size_v<TupleType>>
+      AddPages(
+        wxNotebook* pNotebook,
+        GridArrayType& gridArray,
+        const TupleType& tuple)
     {
       using PacketType = decltype(std::get<Index>(tuple));
 
@@ -86,6 +117,8 @@ namespace dal
       auto pPage = new wxPanel(pNotebook, wxID_ANY);
 
       auto pGrid = new wxGrid(pPage, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0);
+
+      gridArray[Index] = pGrid;
 
       // Grid
       AddGridLabels(pGrid, std::get<Index>(tuple));
@@ -98,12 +131,11 @@ namespace dal
       // Columns
       pGrid->EnableDragColMove(false);
       pGrid->EnableDragColSize(false);
-      pGrid->SetColLabelSize(0);
       pGrid->AutoSizeColumns();
-      pGrid->HideColLabels();
 
       // Rows
       pGrid->EnableDragRowSize(false);
+      pGrid->HideRowLabels();
       pGrid->AutoSizeRows();
 
       // Cell Defaults
@@ -121,46 +153,105 @@ namespace dal
 
       pNotebook->AddPage(pPage, name, false);
 
-      AddPages<Index + 1>(pNotebook, tuple);
+      AddPages<Index + 1>(pNotebook, gridArray, tuple);
+    }
+
+    //--------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
+    template<std::size_t Index = 0, typename T, typename TupleType>
+    typename std::enable_if_t<Index == std::tuple_size_v<TupleType>, size_t>
+      GetIndex(const TupleType& tuple)
+    {
+      throw std::logic_error("unable to get index of wxGrid");
+    }
+
+    //--------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
+    template<std::size_t Index = 0, typename T, typename TupleType>
+    typename std::enable_if_t<Index != std::tuple_size_v<TupleType>, size_t>
+      GetIndex(const TupleType& tuple)
+    {
+      if (
+        std::is_same_v<
+          std::decay_t<decltype(std::get<Index>(tuple))>,
+          std::decay_t<T>>)
+      {
+        return Index;
+      }
+      return GetIndex<Index + 1, T, TupleType>(tuple);
     }
   }
 
+  //----------------------------------------------------------------------------
+  //----------------------------------------------------------------------------
   template <typename ... Args>
-    class GridDisplayer : public wxPanel
+  class GridDisplayer : public wxPanel
   {
     public:
 
+      //------------------------------------------------------------------------
+      //------------------------------------------------------------------------
       GridDisplayer(wxWindow* pParent)
         : wxPanel(pParent, wxID_ANY),
         mFields()
-    {
-      SetSizeHints(wxDefaultSize, wxDefaultSize);
+      {
+        SetSizeHints(wxDefaultSize, wxDefaultSize);
 
-      auto pPanel = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
+        auto pPanel = new wxPanel(
+          this,
+          wxID_ANY,
+          wxDefaultPosition,
+          wxDefaultSize,
+          wxTAB_TRAVERSAL);
 
-      auto pMainSizer = new wxBoxSizer(wxHORIZONTAL);
+        auto pMainSizer = new wxBoxSizer(wxHORIZONTAL);
 
-      auto pNotebook = new wxNotebook(pPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0);
+        auto pNotebook =
+          new wxNotebook(pPanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0);
 
-      AddPages(pNotebook, mFields);
+        AddPages(pNotebook, mGrids, mFields);
 
-      pMainSizer->Add(pNotebook, 1, wxEXPAND | wxALL, 5);
+        pMainSizer->Add(pNotebook, 1, wxEXPAND | wxALL, 5);
 
-      pPanel->SetSizer(pMainSizer);
-      pPanel->Layout();
-      pMainSizer->Fit(pPanel);
+        pPanel->SetSizer(pMainSizer);
+        pPanel->Layout();
+        pMainSizer->Fit(pPanel);
 
-      auto pFrameSizer = new wxBoxSizer(wxHORIZONTAL);
-      pFrameSizer->Add(pPanel, 1, wxEXPAND | wxALL, 5);
+        auto pFrameSizer = new wxBoxSizer(wxHORIZONTAL);
+        pFrameSizer->Add(pPanel, 1, wxEXPAND | wxALL, 5);
 
-      SetSizer(pFrameSizer);
-      pFrameSizer->Fit(this);
-      Layout();
-    }
+        SetSizer(pFrameSizer);
+        pFrameSizer->Fit(this);
+        Layout();
+      }
 
-      private:
+      //------------------------------------------------------------------------
+      //------------------------------------------------------------------------
+      template <typename T>
+      void Set(T t)
+      {
+        static_assert(
+          dl::ContainsType<T>(std::tuple<Args...> {}),
+          "Set must be called with contained type");
+
+        AddGridValues(GetGrid<T>(), t);
+      }
+
+    private:
+
+      //------------------------------------------------------------------------
+      //------------------------------------------------------------------------
+      template <typename T>
+      wxGrid* GetGrid()
+      {
+        return mGrids[GetIndex<0, T, std::tuple<Args...>>(mFields)];
+      }
+
+    private:
 
       std::tuple<Args...> mFields;
+
+      std::array<wxGrid*, std::tuple_size_v<std::tuple<Args...>>> mGrids;
     };
   }
 
