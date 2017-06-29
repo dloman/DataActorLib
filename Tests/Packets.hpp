@@ -21,7 +21,8 @@ namespace dal::test
       Position,
       (double, mPostionX),
       (double, mPostionY),
-      (double, mPostionZ)
+      (double, mPostionZ),
+      (double, mTime)
       );
   };
 }

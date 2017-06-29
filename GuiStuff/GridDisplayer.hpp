@@ -1,6 +1,7 @@
 #pragma once
 
 #include <TypeTraits/TypeTraits.hpp>
+#include <Utility/Helpers.hpp>
 #include <wx/dataview.h>
 #include <wx/grid.h>
 #include <wx/frame.h>
@@ -234,7 +235,7 @@ namespace dal
           dl::ContainsType<T>(std::tuple<Args...> {}),
           "Set must be called with contained type");
 
-        AddGridValues(GetGrid<T>(), t);
+        gs::DoOnGuiThread([t, this] { AddGridValues(GetGrid<T>(), t); });
       }
 
     private:

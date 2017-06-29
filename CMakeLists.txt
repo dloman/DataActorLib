@@ -35,7 +35,16 @@ add_executable(
 target_link_libraries(
   GridDisplayerTest
   ${wxWidgets_LIBRARIES}
-  ${Boost_FILESYSTEM_LIBRARY}
-  ${Boost_SYSTEM_LIBRARY}
+  )
+
+add_executable(
+  DoOnGuiThread
+  WIN32
+  Tests/DoOnGuiThread.cpp
+  )
+
+target_link_libraries(
+  DoOnGuiThread
+  ${wxWidgets_LIBRARIES}
   )
 
