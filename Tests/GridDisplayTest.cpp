@@ -2,13 +2,14 @@
 
 #include <GuiStuff/GridDisplayer.hpp>
 
+#include <Random/Random.hpp>
+
 #include <wx/app.h>
 #include <wx/sizer.h>
 
 #include <atomic>
 #include <chrono>
 #include <memory>
-#include <random>
 #include <thread>
 
 //******************************************************************************
@@ -64,25 +65,24 @@ bool App::OnInit()
 
   mpThread.reset(new std::thread([pGridDisplayer, this]
     {
-      auto Random = []
-      {
-        std::random_device randomDevice;
-        std::mt19937 generator(randomDevice());
-        std::uniform_int_distribution<uint8_t> distribution;
-        return distribution(generator);
-      };
-
       while (mIsRunning)
       {
-        dal::test::MotorCommand MotorCommand{Random(), Random(), Random()};
+        dal::test::MotorCommand MotorCommand
+        {
+          dl::random::GetUniform<uint8_t>(),
+          dl::random::GetUniform<uint8_t>(),
+          dl::random::GetUniform<uint8_t>()
+        };
 
         pGridDisplayer->Set(MotorCommand);
 
-        dal::test::Position Position{
-        static_cast<double>(Random()),
-        static_cast<double>(Random()),
-        static_cast<double>(Random()),
-        static_cast<double>(std::chrono::system_clock::now().time_since_epoch().count())};
+        dal::test::Position Position
+        {
+          dl::random::GetUniform<double>(),
+          dl::random::GetUniform<double>(),
+          dl::random::GetUniform<double>(),
+          static_cast<double>(std::chrono::system_clock::now().time_since_epoch().count())
+        };
 
         pGridDisplayer->Set(Position);
 
