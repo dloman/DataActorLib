@@ -17,7 +17,7 @@
 
 class wxWindow;
 
-namespace dal
+namespace gs
 {
   namespace
   {
@@ -87,6 +87,8 @@ namespace dal
       {
         pGrid->SetCellValue(0, i++, std::to_string(hana::second(pair)));
       });
+
+      pGrid->AutoSizeColumns();
     }
 
     //--------------------------------------------------------------------------

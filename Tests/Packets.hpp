@@ -3,7 +3,7 @@
 #include <boost/hana/define_struct.hpp>
 #include <cstdint>
 
-namespace dal::test
+namespace gs::test
 {
   struct MotorCommand
   {

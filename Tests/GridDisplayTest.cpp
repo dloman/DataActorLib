@@ -48,7 +48,7 @@ bool App::OnInit()
   auto pFrame = new wxFrame(nullptr, wxID_ANY, "Grid Displayer Test");
 
   auto pGridDisplayer =
-    new dal::GridDisplayer<dal::test::MotorCommand, dal::test::Position>(pFrame);
+    new gs::GridDisplayer<gs::test::MotorCommand, gs::test::Position>(pFrame);
 
   auto pMainSizer = new wxBoxSizer(wxHORIZONTAL);
 
@@ -74,15 +74,15 @@ bool App::OnInit()
 
       while (mIsRunning)
       {
-        dal::test::MotorCommand MotorCommand{Random(), Random(), Random()};
+        gs::test::MotorCommand MotorCommand{Random(), Random(), Random()};
 
         pGridDisplayer->Set(MotorCommand);
 
-        dal::test::Position Position{
-        static_cast<double>(Random()),
-        static_cast<double>(Random()),
-        static_cast<double>(Random()),
-        static_cast<double>(std::chrono::system_clock::now().time_since_epoch().count())};
+        gs::test::Position Position{
+          static_cast<double>(Random()) + (1.0 / Random()),
+          static_cast<double>(Random()) + (1.0 / Random()),
+          static_cast<double>(Random()) + (1.0 / Random()),
+          static_cast<double>(std::chrono::system_clock::now().time_since_epoch().count())};
 
         pGridDisplayer->Set(Position);
 

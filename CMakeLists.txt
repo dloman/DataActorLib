@@ -48,3 +48,24 @@ target_link_libraries(
   ${wxWidgets_LIBRARIES}
   )
 
+add_library(
+  GuiStuffLib
+  GuiStuff/ScrollWindow.cpp
+  )
+
+target_link_libraries(
+  DoOnGuiThread
+  ${wxWidgets_LIBRARIES}
+  )
+
+add_executable(
+  ScrollWindowTest
+  Tests/ScrollWindowTest.cpp
+  )
+
+target_link_libraries(
+  ScrollWindowTest
+  GuiStuffLib
+  ${wxWidgets_LIBRARIES}
+  )
+
