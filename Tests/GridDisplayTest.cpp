@@ -2,13 +2,14 @@
 
 #include <GuiStuff/GridDisplayer.hpp>
 
+#include <Random/Random.hpp>
+
 #include <wx/app.h>
 #include <wx/sizer.h>
 
 #include <atomic>
 #include <chrono>
 #include <memory>
-#include <random>
 #include <thread>
 
 //******************************************************************************
@@ -38,6 +39,35 @@ class App : public wxApp
 
 IMPLEMENT_APP(App);
 
+namespace
+{
+
+  //----------------------------------------------------------------------------
+  //----------------------------------------------------------------------------
+  gs::test::MotorCommand GetRandomMotorCommand()
+  {
+    return
+    {
+      dl::random::GetUniform<uint8_t>(),
+      dl::random::GetUniform<uint8_t>(),
+      dl::random::GetUniform<uint8_t>()
+    };
+  }
+
+  //----------------------------------------------------------------------------
+  //----------------------------------------------------------------------------
+  gs::test::Position GetRandomPosition()
+  {
+    return
+    {
+      dl::random::GetUniform<double>(),
+      dl::random::GetUniform<double>(),
+      dl::random::GetUniform<double>(),
+      static_cast<double>(std::chrono::system_clock::now().time_since_epoch().count())
+    };
+  }
+}
+
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 bool App::OnInit()
@@ -64,25 +94,13 @@ bool App::OnInit()
 
   mpThread.reset(new std::thread([pGridDisplayer, this]
     {
-      auto Random = []
-      {
-        std::random_device randomDevice;
-        std::mt19937 generator(randomDevice());
-        std::uniform_int_distribution<uint8_t> distribution;
-        return distribution(generator);
-      };
-
       while (mIsRunning)
       {
-        gs::test::MotorCommand MotorCommand{Random(), Random(), Random()};
+        auto MotorCommand = GetRandomMotorCommand();
 
         pGridDisplayer->Set(MotorCommand);
 
-        gs::test::Position Position{
-          static_cast<double>(Random()) + (1.0 / Random()),
-          static_cast<double>(Random()) + (1.0 / Random()),
-          static_cast<double>(Random()) + (1.0 / Random()),
-          static_cast<double>(std::chrono::system_clock::now().time_since_epoch().count())};
+        auto Position = GetRandomPosition();
 
         pGridDisplayer->Set(Position);
 
