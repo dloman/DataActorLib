@@ -26,6 +26,7 @@ include_directories(.)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1z")
 
+################################################################################
 add_executable(
   GridDisplayerTest
   WIN32
@@ -37,6 +38,7 @@ target_link_libraries(
   ${wxWidgets_LIBRARIES}
   )
 
+################################################################################
 add_executable(
   DoOnGuiThread
   WIN32
@@ -48,16 +50,19 @@ target_link_libraries(
   ${wxWidgets_LIBRARIES}
   )
 
+################################################################################
 add_library(
   GuiStuffLib
   GuiStuff/ScrollWindow.cpp
+  GuiStuff/PictureInPictureWindow.cpp
   )
 
 target_link_libraries(
-  DoOnGuiThread
+  GuiStuffLib
   ${wxWidgets_LIBRARIES}
   )
 
+################################################################################
 add_executable(
   ScrollWindowTest
   Tests/ScrollWindowTest.cpp
@@ -69,3 +74,14 @@ target_link_libraries(
   ${wxWidgets_LIBRARIES}
   )
 
+################################################################################
+add_executable(
+  PictureInPictureWindowTest
+  Tests/PictureInPictureWindowTest.cpp
+  )
+
+target_link_libraries(
+  PictureInPictureWindowTest
+  GuiStuffLib
+  ${wxWidgets_LIBRARIES}
+  )
