@@ -43,17 +43,24 @@ PictureInPictureWindow::PictureInPictureWindow(
     mBitmap2(image2),
     mPrimaryBitmap(mBitmap1),
     mSecondaryBitmap(mBitmap2),
+    mSecondaryViewStart(0, 0),
     mThumbnail(GenerateThumbnail(image2, wxSize(mThumbnailWidth, mThumbnailHeight))),
     mpDrag(nullptr),
-    mViewStart()
+    mViewStart(),
+    mIsMouseCaptured(false)
 {
    auto size = mPrimaryBitmap.GetSize();
+
    SetScrollbars(1, 1, size.GetWidth(), size.GetHeight(), 0, 0);
 
    Refresh();
+
    Update();
+
    ConnectWxStuff();
+
    SetDoubleBuffered(true);
+
    ShowScrollbars(wxSHOW_SB_NEVER, wxSHOW_SB_NEVER);
 }
 
@@ -62,6 +69,7 @@ PictureInPictureWindow::PictureInPictureWindow(
 void PictureInPictureWindow::ConnectWxStuff()
 {
   Bind(wxEVT_LEFT_DOWN, &PictureInPictureWindow::OnLeftClickDown, this);
+  Bind(wxEVT_LEFT_DCLICK, &PictureInPictureWindow::OnLeftClickDoubleClick, this);
   Bind(wxEVT_LEFT_UP, &PictureInPictureWindow::OnLeftClickUp, this);
   Bind(wxEVT_MOTION, &PictureInPictureWindow::OnMouseMotion, this);
   Bind(wxEVT_MOUSE_CAPTURE_LOST, &PictureInPictureWindow::OnMouseCaptureLost, this);
@@ -78,13 +86,7 @@ void PictureInPictureWindow::OnPaint(wxPaintEvent& Event)
 
   Dc.DrawBitmap(mPrimaryBitmap, 0, 0, true);
 
-  auto size = GetSize();
-
-  wxPoint Location = GetViewStart();
-
-  Location.x += .03 * size.GetWidth();
-
-  Location.y += .63 * size.GetHeight();
+  auto Location = GetMiniWindowLocation();
 
   Dc.SetBrush(*wxBLACK_BRUSH);
 
@@ -97,6 +99,21 @@ void PictureInPictureWindow::OnPaint(wxPaintEvent& Event)
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
+wxPoint PictureInPictureWindow::GetMiniWindowLocation() const
+{
+  auto Location = GetViewStart();
+
+  auto size = GetSize();
+
+  Location.x += .03 * size.GetWidth();
+
+  Location.y += .63 * size.GetHeight();
+
+  return Location;
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 void PictureInPictureWindow::OnResize(wxSizeEvent& Event)
 {
   Refresh();
@@ -105,11 +122,56 @@ void PictureInPictureWindow::OnResize(wxSizeEvent& Event)
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-void PictureInPictureWindow::OnLeftClickDown(wxMouseEvent& Event)
+void PictureInPictureWindow::OnLeftClickDown(wxMouseEvent& event)
 {
-  mViewStart = GetViewStart();
-  mpDrag.reset(new wxPoint(Event.GetPosition()));
-  CaptureMouse();
+  if (!IsClickInMiniWindow(event.GetPosition()))
+  {
+    mViewStart = GetViewStart();
+
+    mpDrag.reset(new wxPoint(event.GetPosition()));
+
+    mIsMouseCaptured = true;
+
+    CaptureMouse();
+  }
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+void PictureInPictureWindow::OnLeftClickDoubleClick(wxMouseEvent& event)
+{
+  if (IsClickInMiniWindow(event.GetPosition()))
+  {
+    auto viewStart = GetViewStart();
+
+    mThumbnail = GenerateThumbnail(
+        mPrimaryBitmap.ConvertToImage(),
+        wxSize(mThumbnailWidth, mThumbnailHeight),
+        wxRect(viewStart, GetSize()));
+
+    std::swap(mPrimaryBitmap, mSecondaryBitmap);
+
+    Scroll(mSecondaryViewStart);
+
+    mSecondaryViewStart = viewStart;
+
+    Refresh();
+  }
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+bool PictureInPictureWindow::IsClickInMiniWindow(const wxPoint& point)
+{
+ auto location = GetMiniWindowLocation() - GetViewStart();
+
+ if (
+   point.x > location.x && point.x < location.x + mThumbnailWidth &&
+   point.y > location.y && point.y < location.y + mThumbnailHeight)
+ {
+   return true;
+ }
+ return false;
 }
 
 //------------------------------------------------------------------------------
@@ -131,7 +193,12 @@ void PictureInPictureWindow::OnLeftClickUp(wxMouseEvent& Event)
     PanPrimaryImage(Event.GetPosition());
     mpDrag.reset(nullptr);
   }
-  ReleaseMouse();
+  if (mIsMouseCaptured)
+  {
+    ReleaseMouse();
+
+    mIsMouseCaptured = false;
+  }
 }
 
 //------------------------------------------------------------------------------
@@ -139,7 +206,12 @@ void PictureInPictureWindow::OnLeftClickUp(wxMouseEvent& Event)
 void PictureInPictureWindow::OnMouseCaptureLost(
   wxMouseCaptureLostEvent& Event)
 {
-  ReleaseMouse();
+  if (mIsMouseCaptured)
+  {
+    ReleaseMouse();
+
+    mIsMouseCaptured = false;
+  }
 }
 
 //------------------------------------------------------------------------------
