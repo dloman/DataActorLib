@@ -159,7 +159,7 @@ install(
     GuiStuff/GridDisplayer.hpp
     GuiStuff/ScrollWindow.hpp
     GuiStuff/PictureInPictureWindow.hpp
+    GuiStuff/Helpers.hpp
   DESTINATION
     ${GuiStuff_DIRNAME_include}/GuiStuff
   )
-

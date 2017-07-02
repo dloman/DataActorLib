@@ -10,14 +10,27 @@ namespace
 {
   wxBitmap GenerateThumbnail(
     const wxImage& originalImage,
-    const wxSize desiredSize,
+    wxSize desiredSize,
     const std::optional<wxRect> portionOfTheImageToThumbnail = std::nullopt)
   {
     wxImage image;
 
+    auto originalSize = originalImage.GetSize();
+
     if (portionOfTheImageToThumbnail)
     {
-      image = originalImage.GetSubImage(*portionOfTheImageToThumbnail);
+      auto subImageSize = portionOfTheImageToThumbnail->GetSize();
+
+      if (
+        subImageSize.GetWidth() < originalSize.GetWidth() &&
+        subImageSize.GetHeight() < originalSize.GetHeight())
+      {
+        image = originalImage.GetSubImage(*portionOfTheImageToThumbnail);
+      }
+      else
+      {
+        image = originalImage;
+      }
     }
     else
     {
@@ -27,6 +40,11 @@ namespace
       static_cast<double>(desiredSize.GetWidth()) / image.GetWidth();
 
     image.Rescale(desiredSize.GetWidth(), image.GetHeight() * scaleFactor);
+
+    if (image.GetHeight() < desiredSize.GetHeight())
+    {
+      desiredSize.SetHeight(image.GetHeight());
+    }
 
     return image.Resize(desiredSize, wxPoint(0, 0));
   }
@@ -39,24 +57,36 @@ PictureInPictureWindow::PictureInPictureWindow(
   const wxImage& image1,
   const wxImage& image2)
   : wxScrolledWindow(pParent, wxID_ANY),
-    mBitmap1(image1),
-    mBitmap2(image2),
+    mBitmap1(),
+    mBitmap2(),
     mPrimaryBitmap(mBitmap1),
     mSecondaryBitmap(mBitmap2),
     mSecondaryViewStart(0, 0),
     mImageMutex(),
-    mThumbnail(GenerateThumbnail(image2, wxSize(mThumbnailWidth, mThumbnailHeight))),
+    mThumbnail(),
     mpDrag(nullptr),
     mViewStart(),
     mIsMouseCaptured(false)
 {
-   auto size = mPrimaryBitmap.GetSize();
+   if (image1.IsOk())
+   {
+     mBitmap1 = image1;
 
-   SetScrollbars(1, 1, size.GetWidth(), size.GetHeight(), 0, 0);
+     auto size = mPrimaryBitmap.GetSize();
+
+     SetScrollbars(1, 1, size.GetWidth(), size.GetHeight(), 0, 0);
+
+   }
+
+   if (image2.IsOk())
+   {
+     mBitmap2 = image2;
+
+     mThumbnail =
+       GenerateThumbnail(image2, wxSize(mThumbnailWidth, mThumbnailHeight));
+   }
 
    Refresh();
-
-   Update();
 
    ConnectWxStuff();
 
@@ -85,15 +115,29 @@ void PictureInPictureWindow::OnPaint(wxPaintEvent& Event)
   wxBufferedPaintDC Dc(this);
   DoPrepareDC(Dc);
 
-  Dc.DrawBitmap(mPrimaryBitmap, 0, 0, true);
+  Dc.Clear();
 
-  auto Location = GetMiniWindowLocation();
+  if (mPrimaryBitmap.IsOk())
+  {
+    Dc.DrawBitmap(mPrimaryBitmap, 0, 0, true);
+  }
 
-  Dc.SetBrush(*wxBLACK_BRUSH);
+  if (mSecondaryBitmap.IsOk())
+  {
+    auto Location = GetMiniWindowLocation();
 
-  Dc.DrawRectangle(Location.x - 2, Location.y -2, mThumbnailWidth + 4, mThumbnailHeight + 4);
+    Dc.SetBrush(*wxBLACK_BRUSH);
 
-  Dc.DrawBitmap(mThumbnail, Location.x, Location.y, true);
+    auto thumbnailSize = mThumbnail.GetSize();
+
+    Dc.DrawRectangle(
+      Location.x - 2,
+      Location.y - 2,
+      thumbnailSize.GetWidth() + 4,
+      thumbnailSize.GetHeight() + 4);
+
+    Dc.DrawBitmap(mThumbnail, Location.x, Location.y, true);
+  }
 
   Event.Skip();
 }
@@ -108,7 +152,7 @@ wxPoint PictureInPictureWindow::GetMiniWindowLocation() const
 
   Location.x += .03 * size.GetWidth();
 
-  Location.y += .63 * size.GetHeight();
+  Location.y += .75 * size.GetHeight();
 
   return Location;
 }
@@ -148,10 +192,13 @@ void PictureInPictureWindow::OnLeftClickDoubleClick(wxMouseEvent& event)
     {
       std::lock_guard lock(mImageMutex);
 
-      mThumbnail = GenerateThumbnail(
-        mPrimaryBitmap.ConvertToImage(),
-        wxSize(mThumbnailWidth, mThumbnailHeight),
-        wxRect(viewStart, GetSize()));
+      if (mPrimaryBitmap.IsOk())
+      {
+        mThumbnail = GenerateThumbnail(
+          mPrimaryBitmap.ConvertToImage(),
+          wxSize(mThumbnailWidth, mThumbnailHeight),
+          wxRect(viewStart, GetSize()));
+      }
 
       std::swap(mPrimaryBitmap, mSecondaryBitmap);
     }

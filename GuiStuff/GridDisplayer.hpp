@@ -1,7 +1,7 @@
 #pragma once
 
 #include <TypeTraits/TypeTraits.hpp>
-#include <Utility/Helpers.hpp>
+#include <GuiStuff/Helpers.hpp>
 #include <wx/dataview.h>
 #include <wx/grid.h>
 #include <wx/frame.h>
@@ -146,7 +146,7 @@ namespace gs
 
       auto pPageSizer = new wxBoxSizer(wxHORIZONTAL);
 
-      auto Flags = wxSizerFlags(1).Center().Expand().Border(wxALL, 5);
+      auto Flags = wxSizerFlags(1).Center().Border(wxALL, 5);
 
       pPageSizer->Add(pGrid, Flags);
 

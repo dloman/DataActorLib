@@ -1,5 +1,5 @@
 
-#include <Utility/Helpers.hpp>
+#include <GuiStuff/Helpers.hpp>
 #include <wx/app.h>
 #include <wx/sizer.h>
 #include <wx/frame.h>
