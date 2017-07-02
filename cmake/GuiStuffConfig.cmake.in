@@ -1,0 +1,14 @@
+@PACKAGE_INIT@
+
+SET_AND_CHECK(GuiStuff_INCLUDE_DIR @PACKAGE_GuiStuff_DIRNAME_include@ )
+
+IF(NOT TARGET GuiStuff)
+  INCLUDE(${CMAKE_CURRENT_LIST_DIR}/GuiStuffExports.cmake)
+ENDIF()
+
+SET(GuiStuff_INCLUDE_DIRS ${GuiStuff_INCLUDE_DIR} )
+
+SET(
+  GuiStuff_LIBRARIES
+  GuiStuffLib
+  )
