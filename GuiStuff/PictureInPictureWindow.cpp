@@ -44,6 +44,7 @@ PictureInPictureWindow::PictureInPictureWindow(
     mPrimaryBitmap(mBitmap1),
     mSecondaryBitmap(mBitmap2),
     mSecondaryViewStart(0, 0),
+    mImageMutex(),
     mThumbnail(GenerateThumbnail(image2, wxSize(mThumbnailWidth, mThumbnailHeight))),
     mpDrag(nullptr),
     mViewStart(),
@@ -144,12 +145,16 @@ void PictureInPictureWindow::OnLeftClickDoubleClick(wxMouseEvent& event)
   {
     auto viewStart = GetViewStart();
 
-    mThumbnail = GenerateThumbnail(
+    {
+      std::lock_guard lock(mImageMutex);
+
+      mThumbnail = GenerateThumbnail(
         mPrimaryBitmap.ConvertToImage(),
         wxSize(mThumbnailWidth, mThumbnailHeight),
         wxRect(viewStart, GetSize()));
 
-    std::swap(mPrimaryBitmap, mSecondaryBitmap);
+      std::swap(mPrimaryBitmap, mSecondaryBitmap);
+    }
 
     Scroll(mSecondaryViewStart);
 
@@ -176,21 +181,21 @@ bool PictureInPictureWindow::IsClickInMiniWindow(const wxPoint& point)
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-void PictureInPictureWindow::OnMouseMotion(wxMouseEvent& Event)
+void PictureInPictureWindow::OnMouseMotion(wxMouseEvent& event)
 {
   if (mpDrag)
   {
-    PanPrimaryImage(Event.GetPosition());
+    PanPrimaryImage(event.GetPosition());
   }
 }
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-void PictureInPictureWindow::OnLeftClickUp(wxMouseEvent& Event)
+void PictureInPictureWindow::OnLeftClickUp(wxMouseEvent& event)
 {
   if (mpDrag)
   {
-    PanPrimaryImage(Event.GetPosition());
+    PanPrimaryImage(event.GetPosition());
     mpDrag.reset(nullptr);
   }
   if (mIsMouseCaptured)
@@ -216,11 +221,35 @@ void PictureInPictureWindow::OnMouseCaptureLost(
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-void PictureInPictureWindow::PanPrimaryImage(const wxPoint& Position)
+void PictureInPictureWindow::PanPrimaryImage(const wxPoint& position)
 {
-  auto ScrollDistance = ((*mpDrag - Position));
+  auto scrollDistance = ((*mpDrag - position));
 
-  Scroll(mViewStart + ScrollDistance);
+  Scroll(mViewStart + scrollDistance);
 
+  Refresh();
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+void PictureInPictureWindow::SetImage1(const wxImage& bitmap)
+{
+  {
+    std::lock_guard Lock(mImageMutex);
+
+    mBitmap1 = bitmap;
+  }
+  Refresh();
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+void PictureInPictureWindow::SetImage2(const wxImage& bitmap)
+{
+  {
+    std::lock_guard Lock(mImageMutex);
+
+    mBitmap2 = bitmap;
+  }
   Refresh();
 }

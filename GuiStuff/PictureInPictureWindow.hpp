@@ -1,10 +1,12 @@
 #pragma once
 
-#include <memory>
-
 #include <wx/bitmap.h>
 #include <wx/scrolwin.h>
 #include <wx/gdicmn.h>
+
+#include <memory>
+#include <mutex>
+
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -18,6 +20,10 @@ namespace gs
         wxWindow* pParent,
         const wxImage& Image1,
         const wxImage& Image2);
+
+      void SetImage1(const wxImage& bitmap);
+
+      void SetImage2(const wxImage& bitmap);
 
     private:
 
@@ -54,6 +60,8 @@ namespace gs
       wxBitmap& mSecondaryBitmap;
 
       wxPoint mSecondaryViewStart;
+
+      mutable std::mutex mImageMutex;
 
       wxBitmap mThumbnail;
 
