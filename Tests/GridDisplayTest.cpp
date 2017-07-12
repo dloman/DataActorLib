@@ -2,7 +2,7 @@
 
 #include <GuiStuff/GridDisplayer.hpp>
 
-#include <Random/Random.hpp>
+#include <DanLib/Random/Random.hpp>
 
 #include <wx/app.h>
 #include <wx/sizer.h>

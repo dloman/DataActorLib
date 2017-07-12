@@ -1,4 +1,5 @@
 #include "PictureInPictureWindow.hpp"
+#include <GuiStuff/Helpers.hpp>
 
 #include <wx/dcbuffer.h>
 
@@ -6,6 +7,8 @@
 
 using gs::PictureInPictureWindow;
 
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 namespace
 {
   wxBitmap GenerateThumbnail(
@@ -52,15 +55,14 @@ namespace
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-PictureInPictureWindow::PictureInPictureWindow(
-  wxWindow* pParent,
-  const wxImage& image1,
-  const wxImage& image2)
+PictureInPictureWindow::PictureInPictureWindow(wxWindow* pParent)
   : wxScrolledWindow(pParent, wxID_ANY),
     mBitmap1(),
     mBitmap2(),
-    mPrimaryBitmap(mBitmap1),
-    mSecondaryBitmap(mBitmap2),
+    mImage1(),
+    mImage2(),
+    mpPrimaryBitmap(&mBitmap1),
+    mpSecondaryBitmap(&mBitmap2),
     mSecondaryViewStart(0, 0),
     mImageMutex(),
     mThumbnail(),
@@ -68,11 +70,28 @@ PictureInPictureWindow::PictureInPictureWindow(
     mViewStart(),
     mIsMouseCaptured(false)
 {
+   Refresh();
+
+   ConnectWxStuff();
+
+   SetDoubleBuffered(true);
+
+   ShowScrollbars(wxSHOW_SB_NEVER, wxSHOW_SB_NEVER);
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+PictureInPictureWindow::PictureInPictureWindow(
+  wxWindow* pParent,
+  const wxImage& image1,
+  const wxImage& image2)
+  : PictureInPictureWindow(pParent)
+{
    if (image1.IsOk())
    {
      mBitmap1 = image1;
 
-     auto size = mPrimaryBitmap.GetSize();
+     auto size = GetSize();
 
      SetScrollbars(1, 1, size.GetWidth(), size.GetHeight(), 0, 0);
 
@@ -87,12 +106,6 @@ PictureInPictureWindow::PictureInPictureWindow(
    }
 
    Refresh();
-
-   ConnectWxStuff();
-
-   SetDoubleBuffered(true);
-
-   ShowScrollbars(wxSHOW_SB_NEVER, wxSHOW_SB_NEVER);
 }
 
 //------------------------------------------------------------------------------
@@ -117,28 +130,31 @@ void PictureInPictureWindow::OnPaint(wxPaintEvent& Event)
 
   Dc.Clear();
 
-  if (mPrimaryBitmap.IsOk())
   {
-    Dc.DrawBitmap(mPrimaryBitmap, 0, 0, true);
+    std::lock_guard lock(mImageMutex);
+
+    if (mpPrimaryBitmap->IsOk())
+    {
+      Dc.DrawBitmap(*mpPrimaryBitmap, 0, 0, true);
+    }
+
+    if (mpSecondaryBitmap->IsOk() && mThumbnail.IsOk())
+    {
+      auto Location = GetMiniWindowLocation();
+
+      Dc.SetBrush(*wxBLACK_BRUSH);
+
+      auto thumbnailSize = mThumbnail.GetSize();
+
+      Dc.DrawRectangle(
+        Location.x - 2,
+        Location.y - 2,
+        thumbnailSize.GetWidth() + 4,
+        thumbnailSize.GetHeight() + 4);
+
+      Dc.DrawBitmap(mThumbnail, Location.x, Location.y, true);
+    }
   }
-
-  if (mSecondaryBitmap.IsOk())
-  {
-    auto Location = GetMiniWindowLocation();
-
-    Dc.SetBrush(*wxBLACK_BRUSH);
-
-    auto thumbnailSize = mThumbnail.GetSize();
-
-    Dc.DrawRectangle(
-      Location.x - 2,
-      Location.y - 2,
-      thumbnailSize.GetWidth() + 4,
-      thumbnailSize.GetHeight() + 4);
-
-    Dc.DrawBitmap(mThumbnail, Location.x, Location.y, true);
-  }
-
   Event.Skip();
 }
 
@@ -180,7 +196,7 @@ void PictureInPictureWindow::OnLeftClickDown(wxMouseEvent& event)
     CaptureMouse();
   }
 }
-
+#include <iostream>
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 void PictureInPictureWindow::OnLeftClickDoubleClick(wxMouseEvent& event)
@@ -192,15 +208,15 @@ void PictureInPictureWindow::OnLeftClickDoubleClick(wxMouseEvent& event)
     {
       std::lock_guard lock(mImageMutex);
 
-      if (mPrimaryBitmap.IsOk())
+      if (mpPrimaryBitmap->IsOk())
       {
         mThumbnail = GenerateThumbnail(
-          mPrimaryBitmap.ConvertToImage(),
+          mpPrimaryBitmap->ConvertToImage(),
           wxSize(mThumbnailWidth, mThumbnailHeight),
           wxRect(viewStart, GetSize()));
       }
 
-      std::swap(mPrimaryBitmap, mSecondaryBitmap);
+      std::swap(mpPrimaryBitmap, mpSecondaryBitmap);
     }
 
     Scroll(mSecondaryViewStart);
@@ -279,24 +295,107 @@ void PictureInPictureWindow::PanPrimaryImage(const wxPoint& position)
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-void PictureInPictureWindow::SetImage1(const wxImage& bitmap)
+void PictureInPictureWindow::SetImage1(const wxImage& image)
 {
+  gs::DoOnGuiThread([this, image]
   {
-    std::lock_guard Lock(mImageMutex);
+    {
+      std::lock_guard Lock(mImageMutex);
 
-    mBitmap1 = bitmap;
-  }
-  Refresh();
+      mBitmap1 = image;
+
+      if (&mBitmap1 == mpSecondaryBitmap.get())
+      {
+        mThumbnail = GenerateThumbnail(
+          mpSecondaryBitmap->ConvertToImage(),
+          wxSize(mThumbnailWidth, mThumbnailHeight));
+      }
+    }
+    Refresh();
+  });
 }
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-void PictureInPictureWindow::SetImage2(const wxImage& bitmap)
+void PictureInPictureWindow::SetImage2(const wxImage& image)
 {
+  gs::DoOnGuiThread([this, image]
   {
-    std::lock_guard Lock(mImageMutex);
+    {
+      std::lock_guard Lock(mImageMutex);
 
-    mBitmap2 = bitmap;
-  }
-  Refresh();
+      mBitmap2 = image;
+
+      if (&mBitmap2 == mpSecondaryBitmap.get())
+      {
+        mThumbnail = GenerateThumbnail(
+          mpSecondaryBitmap->ConvertToImage(),
+          wxSize(mThumbnailWidth, mThumbnailHeight));
+      }
+    }
+    Refresh();
+  });
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+void PictureInPictureWindow::SetImage1(const dl::image::Image& image)
+{
+  gs::DoOnGuiThread([this, image]
+  {
+    {
+      std::lock_guard Lock(mImageMutex);
+
+      mImage1 = image;
+
+      wxImage displayImage(
+        image.GetWidth(),
+        image.GetHeight(),
+        reinterpret_cast<unsigned char*> (mImage1.GetData().get()),
+        true);
+
+      mBitmap1 = displayImage;
+
+      if (&mBitmap1 == mpSecondaryBitmap.get())
+      {
+        mThumbnail = GenerateThumbnail(
+          mpSecondaryBitmap->ConvertToImage(),
+          wxSize(mThumbnailWidth, mThumbnailHeight),
+          wxRect(GetViewStart(), GetSize()));
+      }
+    }
+    Refresh();
+  });
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+void PictureInPictureWindow::SetImage2(const dl::image::Image& image)
+{
+  gs::DoOnGuiThread([this, image]
+  {
+    {
+      std::lock_guard Lock(mImageMutex);
+
+      mImage2 = image;
+
+      wxImage displayImage(
+        image.GetWidth(),
+        image.GetHeight(),
+        reinterpret_cast<unsigned char*> (mImage2.GetData().get()),
+        true);
+
+      mBitmap2 = displayImage;
+
+      std::cout << &mBitmap2 << " vs " << mpSecondaryBitmap.get() << std::endl;
+      if (&mBitmap2 == mpSecondaryBitmap.get())
+      {
+        mThumbnail = GenerateThumbnail(
+          mpSecondaryBitmap->ConvertToImage(),
+          wxSize(mThumbnailWidth, mThumbnailHeight),
+          wxRect(GetViewStart(), GetSize()));
+      }
+    }
+    Refresh();
+  });
 }

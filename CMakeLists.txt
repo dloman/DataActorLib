@@ -69,6 +69,7 @@ add_library(
 
 target_link_libraries(
   GuiStuffLib
+  Image
   ${wxWidgets_LIBRARIES}
   )
 

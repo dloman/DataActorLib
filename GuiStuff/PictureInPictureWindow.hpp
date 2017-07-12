@@ -1,12 +1,13 @@
 #pragma once
 
+#include <DanLib/Images/Image.hpp>
+
 #include <wx/bitmap.h>
 #include <wx/scrolwin.h>
 #include <wx/gdicmn.h>
 
 #include <memory>
 #include <mutex>
-
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -16,6 +17,8 @@ namespace gs
   {
     public:
 
+      PictureInPictureWindow(wxWindow* pParent);
+
       PictureInPictureWindow(
         wxWindow* pParent,
         const wxImage& Image1,
@@ -24,6 +27,10 @@ namespace gs
       void SetImage1(const wxImage& bitmap);
 
       void SetImage2(const wxImage& bitmap);
+
+      void SetImage1(const dl::image::Image& image);
+
+      void SetImage2(const dl::image::Image& image);
 
     private:
 
@@ -55,9 +62,13 @@ namespace gs
 
       wxBitmap mBitmap2;
 
-      wxBitmap& mPrimaryBitmap;
+      dl::image::Image mImage1;
 
-      wxBitmap& mSecondaryBitmap;
+      dl::image::Image mImage2;
+
+      std::experimental::observer_ptr<wxBitmap> mpPrimaryBitmap;
+
+      std::experimental::observer_ptr<wxBitmap> mpSecondaryBitmap;
 
       wxPoint mSecondaryViewStart;
 
