@@ -11,6 +11,8 @@ using gs::PictureInPictureWindow;
 //------------------------------------------------------------------------------
 namespace
 {
+  //----------------------------------------------------------------------------
+  //----------------------------------------------------------------------------
   wxBitmap GenerateThumbnail(
     const wxImage& originalImage,
     wxSize desiredSize,
@@ -122,7 +124,7 @@ void PictureInPictureWindow::ConnectWxStuff()
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-void PictureInPictureWindow::OnPaint(wxPaintEvent& Event)
+void PictureInPictureWindow::OnPaint(wxPaintEvent& event)
 {
   wxBufferedPaintDC Dc(this);
   DoPrepareDC(Dc);
@@ -147,22 +149,22 @@ void PictureInPictureWindow::OnPaint(wxPaintEvent& Event)
 
     if (pSecondaryBitmap->IsOk() && mThumbnail.IsOk())
     {
-      auto Location = GetMiniWindowLocation();
+      auto location = GetMiniWindowLocation();
 
       Dc.SetBrush(*wxBLACK_BRUSH);
 
       auto thumbnailSize = mThumbnail.GetSize();
 
       Dc.DrawRectangle(
-        Location.x - 2,
-        Location.y - 2,
+        location.x - 2,
+        location.y - 2,
         thumbnailSize.GetWidth() + 4,
         thumbnailSize.GetHeight() + 4);
 
-      Dc.DrawBitmap(mThumbnail, Location.x, Location.y, true);
+        Dc.DrawBitmap(mThumbnail, location.x, location.y, true);
     }
   }
-  Event.Skip();
+  event.Skip();
 }
 
 //------------------------------------------------------------------------------
