@@ -66,9 +66,7 @@ namespace gs
 
       dl::image::Image mImage2;
 
-      std::experimental::observer_ptr<wxBitmap> mpPrimaryBitmap;
-
-      std::experimental::observer_ptr<wxBitmap> mpSecondaryBitmap;
+      bool mIsPrimaryDisplayBitmap1;
 
       wxPoint mSecondaryViewStart;
 

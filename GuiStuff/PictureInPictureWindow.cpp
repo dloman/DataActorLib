@@ -61,8 +61,7 @@ PictureInPictureWindow::PictureInPictureWindow(wxWindow* pParent)
     mBitmap2(),
     mImage1(),
     mImage2(),
-    mpPrimaryBitmap(&mBitmap1),
-    mpSecondaryBitmap(&mBitmap2),
+    mIsPrimaryDisplayBitmap1(true),
     mSecondaryViewStart(0, 0),
     mImageMutex(),
     mThumbnail(),
@@ -133,12 +132,20 @@ void PictureInPictureWindow::OnPaint(wxPaintEvent& Event)
   {
     std::lock_guard lock(mImageMutex);
 
-    if (mpPrimaryBitmap->IsOk())
+    auto pPrimaryBitmap = &mBitmap1;
+    auto pSecondaryBitmap = &mBitmap2;
+
+    if (!mIsPrimaryDisplayBitmap1)
     {
-      Dc.DrawBitmap(*mpPrimaryBitmap, 0, 0, true);
+      std::swap(pPrimaryBitmap, pSecondaryBitmap);
     }
 
-    if (mpSecondaryBitmap->IsOk() && mThumbnail.IsOk())
+    if (pPrimaryBitmap->IsOk())
+    {
+      Dc.DrawBitmap(*pPrimaryBitmap, 0, 0, true);
+    }
+
+    if (pSecondaryBitmap->IsOk() && mThumbnail.IsOk())
     {
       auto Location = GetMiniWindowLocation();
 
@@ -196,7 +203,7 @@ void PictureInPictureWindow::OnLeftClickDown(wxMouseEvent& event)
     CaptureMouse();
   }
 }
-#include <iostream>
+
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 void PictureInPictureWindow::OnLeftClickDoubleClick(wxMouseEvent& event)
@@ -208,15 +215,21 @@ void PictureInPictureWindow::OnLeftClickDoubleClick(wxMouseEvent& event)
     {
       std::lock_guard lock(mImageMutex);
 
-      if (mpPrimaryBitmap->IsOk())
+      if (mIsPrimaryDisplayBitmap1 && mBitmap1.IsOk())
       {
         mThumbnail = GenerateThumbnail(
-          mpPrimaryBitmap->ConvertToImage(),
+          mBitmap1.ConvertToImage(),
           wxSize(mThumbnailWidth, mThumbnailHeight),
           wxRect(viewStart, GetSize()));
       }
-
-      std::swap(mpPrimaryBitmap, mpSecondaryBitmap);
+      else if (!mIsPrimaryDisplayBitmap1 && mBitmap2.IsOk())
+      {
+        mThumbnail = GenerateThumbnail(
+          mBitmap2.ConvertToImage(),
+          wxSize(mThumbnailWidth, mThumbnailHeight),
+          wxRect(viewStart, GetSize()));
+      }
+      mIsPrimaryDisplayBitmap1 = !mIsPrimaryDisplayBitmap1;
     }
 
     Scroll(mSecondaryViewStart);
@@ -304,10 +317,10 @@ void PictureInPictureWindow::SetImage1(const wxImage& image)
 
       mBitmap1 = image;
 
-      if (&mBitmap1 == mpSecondaryBitmap.get())
+      if (!mIsPrimaryDisplayBitmap1)
       {
         mThumbnail = GenerateThumbnail(
-          mpSecondaryBitmap->ConvertToImage(),
+          mBitmap1.ConvertToImage(),
           wxSize(mThumbnailWidth, mThumbnailHeight));
       }
     }
@@ -326,10 +339,10 @@ void PictureInPictureWindow::SetImage2(const wxImage& image)
 
       mBitmap2 = image;
 
-      if (&mBitmap2 == mpSecondaryBitmap.get())
+      if (mIsPrimaryDisplayBitmap1)
       {
         mThumbnail = GenerateThumbnail(
-          mpSecondaryBitmap->ConvertToImage(),
+          mBitmap2.ConvertToImage(),
           wxSize(mThumbnailWidth, mThumbnailHeight));
       }
     }
@@ -356,10 +369,10 @@ void PictureInPictureWindow::SetImage1(const dl::image::Image& image)
 
       mBitmap1 = displayImage;
 
-      if (&mBitmap1 == mpSecondaryBitmap.get())
+      if (!mIsPrimaryDisplayBitmap1)
       {
         mThumbnail = GenerateThumbnail(
-          mpSecondaryBitmap->ConvertToImage(),
+          mBitmap1.ConvertToImage(),
           wxSize(mThumbnailWidth, mThumbnailHeight),
           wxRect(GetViewStart(), GetSize()));
       }
@@ -387,11 +400,10 @@ void PictureInPictureWindow::SetImage2(const dl::image::Image& image)
 
       mBitmap2 = displayImage;
 
-      std::cout << &mBitmap2 << " vs " << mpSecondaryBitmap.get() << std::endl;
-      if (&mBitmap2 == mpSecondaryBitmap.get())
+      if (mIsPrimaryDisplayBitmap1)
       {
         mThumbnail = GenerateThumbnail(
-          mpSecondaryBitmap->ConvertToImage(),
+          mBitmap2.ConvertToImage(),
           wxSize(mThumbnailWidth, mThumbnailHeight),
           wxRect(GetViewStart(), GetSize()));
       }
