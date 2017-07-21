@@ -24,10 +24,6 @@ namespace gs
         const wxImage& Image1,
         const wxImage& Image2);
 
-      void SetImage1(const wxImage& bitmap);
-
-      void SetImage2(const wxImage& bitmap);
-
       void SetImage1(const dl::image::Image& image);
 
       void SetImage2(const dl::image::Image& image);
@@ -41,6 +37,13 @@ namespace gs
       wxPoint GetMiniWindowLocation() const;
 
       void OnResize(wxSizeEvent& Event);
+
+      wxImage GeneratePrimaryImage() const;
+
+      wxSize GetThumbnailSize() const;
+
+      wxImage GenerateThumbnail(
+        const std::optional<wxRect> portionOfTheImageToThumbnail = std::nullopt) const;
 
       void OnLeftClickUp(wxMouseEvent& Event);
 
@@ -58,21 +61,21 @@ namespace gs
 
     private:
 
-      wxBitmap mBitmap1;
-
-      wxBitmap mBitmap2;
-
       dl::image::Image mImage1;
 
       dl::image::Image mImage2;
+
+      mutable std::mutex mImageMutex;
 
       bool mIsPrimaryDisplayBitmap1;
 
       wxPoint mSecondaryViewStart;
 
-      mutable std::mutex mImageMutex;
+      mutable std::mutex mBitmapMutex;
 
       wxBitmap mThumbnail;
+
+      wxBitmap mPrimaryBitmap;
 
       std::unique_ptr<wxPoint> mpDrag;
 
@@ -80,8 +83,8 @@ namespace gs
 
       bool mIsMouseCaptured;
 
-      static constexpr int mThumbnailWidth = 340;
+      static constexpr unsigned mThumbnailWidth = 340;
 
-      static constexpr int mThumbnailHeight = 220;
+      static constexpr unsigned mThumbnailHeight = 220;
   };
 }

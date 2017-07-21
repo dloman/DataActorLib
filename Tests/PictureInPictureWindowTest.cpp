@@ -44,7 +44,21 @@ bool App::OnInit()
   }
 
   auto pPictureInPicture =
-    new gs::PictureInPictureWindow(pFrame, Image1, Image2);
+    new gs::PictureInPictureWindow(pFrame);
+
+  dl::image::Image imageWrapper1(
+    Image1.GetWidth(),
+    Image1.GetHeight(),
+    std::experimental::make_observer(reinterpret_cast<std::byte*>(Image1.GetData())));
+
+  dl::image::Image imageWrapper2(
+    Image2.GetWidth(),
+    Image2.GetHeight(),
+    std::experimental::make_observer(reinterpret_cast<std::byte*>(Image2.GetData())));
+
+  pPictureInPicture->SetImage1(imageWrapper1);
+
+  pPictureInPicture->SetImage2(imageWrapper2);
 
   pSizer->Add(pPictureInPicture, 1, wxEXPAND);
 
