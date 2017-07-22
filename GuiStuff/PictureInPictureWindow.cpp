@@ -343,19 +343,34 @@ void PictureInPictureWindow::SetImage1(const dl::image::Image& image)
     mImage1 = image;
   }
 
-  wxImage primaryImage;
+  std::optional<wxImage> primaryImage, thumbnail;
 
   {
     std::lock_guard Lock(mBitmapMutex);
 
-    primaryImage = GeneratePrimaryImage();
+    if (mIsPrimaryDisplayBitmap1)
+    {
+      primaryImage = GeneratePrimaryImage();
+    }
+    else
+    {
+      thumbnail = GenerateThumbnail();
+    }
   }
 
-  gs::DoOnGuiThread([this, primaryImage = std::move(primaryImage)]
+  gs::DoOnGuiThread(
+    [this, primaryImage = std::move(primaryImage), thumbnail = std::move(thumbnail)]
   {
-    mPrimaryBitmap = primaryImage;
+    std::lock_guard Lock(mBitmapMutex);
 
-    mThumbnail = GenerateThumbnail();
+    if (primaryImage)
+    {
+      mPrimaryBitmap = *primaryImage;
+    }
+    else
+    {
+      mThumbnail = *thumbnail;
+    }
 
     Refresh();
   });
@@ -371,19 +386,120 @@ void PictureInPictureWindow::SetImage2(const dl::image::Image& image)
     mImage2 = image;
   }
 
-  wxImage primaryImage;
+  std::optional<wxImage> primaryImage, thumbnail;
 
   {
     std::lock_guard Lock(mBitmapMutex);
 
-    primaryImage = GeneratePrimaryImage();
+    if (!mIsPrimaryDisplayBitmap1)
+    {
+      primaryImage = GeneratePrimaryImage();
+    }
+    else
+    {
+      thumbnail = GenerateThumbnail();
+    }
   }
 
-  gs::DoOnGuiThread([this, primaryImage = std::move(primaryImage)]
+  gs::DoOnGuiThread(
+    [this, primaryImage = std::move(primaryImage), thumbnail = std::move(thumbnail)]
   {
-    mPrimaryBitmap = primaryImage;
+    std::lock_guard Lock(mBitmapMutex);
 
-    mThumbnail = GenerateThumbnail();
+    if (primaryImage)
+    {
+      mPrimaryBitmap = *primaryImage;
+    }
+    else
+    {
+      mThumbnail = *thumbnail;
+    }
+
+    Refresh();
+  });
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+void PictureInPictureWindow::SetImage1(dl::image::Image&& image)
+{
+  {
+    std::lock_guard Lock(mImageMutex);
+
+    mImage1 = std::move(image);
+  }
+
+  std::optional<wxImage> primaryImage, thumbnail;
+
+  {
+    std::lock_guard Lock(mBitmapMutex);
+
+    if (mIsPrimaryDisplayBitmap1)
+    {
+      primaryImage = GeneratePrimaryImage();
+    }
+    else
+    {
+      thumbnail = GenerateThumbnail();
+    }
+  }
+
+  gs::DoOnGuiThread(
+    [this, primaryImage = std::move(primaryImage), thumbnail = std::move(thumbnail)]
+  {
+    std::lock_guard Lock(mBitmapMutex);
+
+    if (primaryImage)
+    {
+      mPrimaryBitmap = *primaryImage;
+    }
+    else
+    {
+      mThumbnail = *thumbnail;
+    }
+
+    Refresh();
+  });
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+void PictureInPictureWindow::SetImage2(dl::image::Image&& image)
+{
+  {
+    std::lock_guard Lock(mImageMutex);
+
+    mImage2 = std::move(image);
+  }
+
+  std::optional<wxImage> primaryImage, thumbnail;
+
+  {
+    std::lock_guard Lock(mBitmapMutex);
+
+    if (!mIsPrimaryDisplayBitmap1)
+    {
+      primaryImage = GeneratePrimaryImage();
+    }
+    else
+    {
+      thumbnail = GenerateThumbnail();
+    }
+  }
+
+  gs::DoOnGuiThread(
+    [this, primaryImage = std::move(primaryImage), thumbnail = std::move(thumbnail)]
+  {
+    std::lock_guard Lock(mBitmapMutex);
+
+    if (primaryImage)
+    {
+      mPrimaryBitmap = *primaryImage;
+    }
+    else
+    {
+      mThumbnail = *thumbnail;
+    }
 
     Refresh();
   });

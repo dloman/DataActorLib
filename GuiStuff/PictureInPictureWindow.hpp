@@ -26,7 +26,11 @@ namespace gs
 
       void SetImage1(const dl::image::Image& image);
 
+      void SetImage1(dl::image::Image&& image);
+
       void SetImage2(const dl::image::Image& image);
+
+      void SetImage2(dl::image::Image&& image);
 
     private:
 
