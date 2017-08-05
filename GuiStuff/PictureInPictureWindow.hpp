@@ -7,7 +7,9 @@
 #include <wx/gdicmn.h>
 
 #include <memory>
+#include <experimental/memory>
 #include <mutex>
+#include <iostream>
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -62,6 +64,9 @@ namespace gs
       void OnMouseMotion(wxMouseEvent& Event);
 
       void PanPrimaryImage(const wxPoint& Position);
+
+      wxSize GetDesiredPrimaryImageSize(
+        std::experimental::observer_ptr<const dl::image::Image> pImage) const;
 
     private:
 

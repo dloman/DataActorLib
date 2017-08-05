@@ -83,6 +83,28 @@ void PictureInPictureWindow::OnPaint(wxPaintEvent& event)
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
+wxSize PictureInPictureWindow::GetDesiredPrimaryImageSize(
+  std::experimental::observer_ptr<const dl::image::Image> pImage) const
+{
+  auto size = GetSize();
+
+  auto WidthScale =
+    static_cast<double>(size.GetWidth()) / static_cast<double>(pImage->GetWidth());
+
+  auto HeightScale =
+    static_cast<double>(size.GetHeight()) / static_cast<double>(pImage->GetHeight());
+
+  auto Scale = std::min(WidthScale, HeightScale);
+
+  Scale = std::max(1.0, Scale);
+
+  return wxSize(pImage->GetWidth() * Scale, pImage->GetHeight() * Scale);
+}
+
+
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 wxPoint PictureInPictureWindow::GetMiniWindowLocation() const
 {
   auto Location = GetViewStart();
@@ -126,7 +148,9 @@ wxImage PictureInPictureWindow::GeneratePrimaryImage() const
     reinterpret_cast<unsigned char*> (pImage->GetData().get()),
     true);
 
-  return displayImage.Resize(GetSize(), wxPoint(0, 0));
+  auto size = GetDesiredPrimaryImageSize(std::experimental::make_observer(pImage));
+
+  return displayImage.Rescale(size.GetWidth(), size.GetHeight(), wxIMAGE_QUALITY_NEAREST);
 }
 
 //------------------------------------------------------------------------------
@@ -238,17 +262,7 @@ void PictureInPictureWindow::OnLeftClickDoubleClick(wxMouseEvent& event)
     auto viewStart = GetViewStart();
 
     {
-      std::lock_guard imageLock(mImageMutex);
-
-      auto pPrimaryImage = &mImage1;
-      auto pSecondaryImage = &mImage2;
-
-      if (!mIsPrimaryDisplayBitmap1)
-      {
-        std::swap(pPrimaryImage, pSecondaryImage);
-      }
-
-      std::lock_guard bitmapLock(mBitmapMutex);
+      std::lock_guard lock(mBitmapMutex);
 
       mIsPrimaryDisplayBitmap1 = !mIsPrimaryDisplayBitmap1;
 
@@ -281,6 +295,9 @@ bool PictureInPictureWindow::IsClickInMiniWindow(const wxPoint& point)
  }
  return false;
 }
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
