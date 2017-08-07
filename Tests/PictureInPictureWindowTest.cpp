@@ -46,19 +46,19 @@ bool App::OnInit()
   auto pPictureInPicture =
     new gs::PictureInPictureWindow(pFrame);
 
-  dl::image::Image imageWrapper1(
+  auto pImageWrapper1 = std::make_shared<const dl::image::Image>(
     Image1.GetWidth(),
     Image1.GetHeight(),
     std::experimental::make_observer(reinterpret_cast<std::byte*>(Image1.GetData())));
 
-  dl::image::Image imageWrapper2(
+  auto pImageWrapper2 = std::make_shared<const dl::image::Image>(
     Image2.GetWidth(),
     Image2.GetHeight(),
     std::experimental::make_observer(reinterpret_cast<std::byte*>(Image2.GetData())));
 
-  pPictureInPicture->SetImage1(imageWrapper1);
+  pPictureInPicture->SetImage1(pImageWrapper1);
 
-  pPictureInPicture->SetImage2(imageWrapper2);
+  pPictureInPicture->SetImage2(pImageWrapper2);
 
   pSizer->Add(pPictureInPicture, 1, wxEXPAND);
 

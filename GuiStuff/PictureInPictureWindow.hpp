@@ -26,13 +26,9 @@ namespace gs
         const wxImage& Image1,
         const wxImage& Image2);
 
-      void SetImage1(const dl::image::Image& image);
+      void SetImage1(const std::shared_ptr<const dl::image::Image>& pImage);
 
-      void SetImage1(dl::image::Image&& image);
-
-      void SetImage2(const dl::image::Image& image);
-
-      void SetImage2(dl::image::Image&& image);
+      void SetImage2(const std::shared_ptr<const dl::image::Image>& pImage);
 
     private:
 
@@ -40,15 +36,15 @@ namespace gs
 
       void OnPaint(wxPaintEvent& Event);
 
-      wxPoint GetMiniWindowLocation() const;
+      wxPoint DoGetMiniWindowLocation() const;
 
       void OnResize(wxSizeEvent& Event);
 
-      wxImage GeneratePrimaryImage() const;
+      wxImage DoGeneratePrimaryImage();
 
-      wxSize GetThumbnailSize() const;
+      wxSize DoGetThumbnailSize() const;
 
-      wxImage GenerateThumbnail(
+      wxImage DoGenerateThumbnail(
         const std::optional<wxRect> portionOfTheImageToThumbnail = std::nullopt) const;
 
       void OnLeftClickUp(wxMouseEvent& Event);
@@ -57,7 +53,7 @@ namespace gs
 
       void OnLeftClickDoubleClick(wxMouseEvent& Event);
 
-      bool IsClickInMiniWindow(const wxPoint& Point);
+      bool DoIsClickInMiniWindow(const wxPoint& Point);
 
       void OnMouseCaptureLost(wxMouseCaptureLostEvent& Event);
 
@@ -70,17 +66,17 @@ namespace gs
 
     private:
 
-      dl::image::Image mImage1;
+      std::shared_ptr<const dl::image::Image> mpImage1;
 
-      dl::image::Image mImage2;
+      std::shared_ptr<const dl::image::Image> mpImage2;
 
       mutable std::mutex mImageMutex;
 
       bool mIsPrimaryDisplayBitmap1;
 
-      wxPoint mSecondaryViewStart;
+      mutable std::mutex mPrimaryDisplayMutex;
 
-      mutable std::mutex mBitmapMutex;
+      wxPoint mSecondaryViewStart;
 
       wxBitmap mThumbnail;
 

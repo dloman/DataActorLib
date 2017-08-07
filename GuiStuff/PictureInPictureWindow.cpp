@@ -11,15 +11,15 @@ using gs::PictureInPictureWindow;
 //------------------------------------------------------------------------------
 PictureInPictureWindow::PictureInPictureWindow(wxWindow* pParent)
   : wxScrolledWindow(pParent, wxID_ANY),
-    mImage1(),
-    mImage2(),
+    mpImage1(nullptr),
+    mpImage2(nullptr),
     mImageMutex(),
     mIsPrimaryDisplayBitmap1(true),
+    mPrimaryDisplayMutex(),
     mSecondaryViewStart(0, 0),
-    mBitmapMutex(),
     mThumbnail(),
     mpDrag(nullptr),
-    mViewStart(),
+    mViewStart(0, 0),
     mIsMouseCaptured(false)
 {
    Refresh();
@@ -54,7 +54,7 @@ void PictureInPictureWindow::OnPaint(wxPaintEvent& event)
   Dc.Clear();
 
   {
-    std::lock_guard lock(mBitmapMutex);
+    std::lock_guard lock(mImageMutex);
 
     if (mPrimaryBitmap.IsOk())
     {
@@ -63,7 +63,7 @@ void PictureInPictureWindow::OnPaint(wxPaintEvent& event)
 
     if (mThumbnail.IsOk())
     {
-      auto location = GetMiniWindowLocation();
+      auto location = DoGetMiniWindowLocation();
 
       Dc.SetBrush(*wxBLACK_BRUSH);
 
@@ -78,7 +78,6 @@ void PictureInPictureWindow::OnPaint(wxPaintEvent& event)
         Dc.DrawBitmap(mThumbnail, location.x, location.y, true);
     }
   }
-  event.Skip();
 }
 
 //------------------------------------------------------------------------------
@@ -105,7 +104,7 @@ wxSize PictureInPictureWindow::GetDesiredPrimaryImageSize(
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-wxPoint PictureInPictureWindow::GetMiniWindowLocation() const
+wxPoint PictureInPictureWindow::DoGetMiniWindowLocation() const
 {
   auto Location = GetViewStart();
 
@@ -123,9 +122,17 @@ wxPoint PictureInPictureWindow::GetMiniWindowLocation() const
 void PictureInPictureWindow::OnResize(wxSizeEvent& Event)
 {
   {
-    std::lock_guard lock(mBitmapMutex);
+    std::lock_guard imageLock(mImageMutex);
 
-    mPrimaryBitmap = GeneratePrimaryImage();
+    mPrimaryBitmap = DoGeneratePrimaryImage();
+
+    SetScrollbars(
+      1,
+      1,
+      mPrimaryBitmap.GetWidth(),
+      mPrimaryBitmap.GetHeight(),
+      mViewStart.x,
+      mViewStart.y);
   }
 
   Refresh();
@@ -133,13 +140,18 @@ void PictureInPictureWindow::OnResize(wxSizeEvent& Event)
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-wxImage PictureInPictureWindow::GeneratePrimaryImage() const
+wxImage PictureInPictureWindow::DoGeneratePrimaryImage()
 {
-  auto pImage= &mImage1;
+  auto pImage = std::experimental::make_observer(mpImage1.get());
 
   if (!mIsPrimaryDisplayBitmap1)
   {
-    pImage= &mImage2;
+    pImage = std::experimental::make_observer(mpImage2.get());
+  }
+
+  if (!pImage)
+  {
+    return wxImage();
   }
 
   wxImage displayImage(
@@ -148,20 +160,36 @@ wxImage PictureInPictureWindow::GeneratePrimaryImage() const
     reinterpret_cast<unsigned char*> (pImage->GetData().get()),
     true);
 
-  auto size = GetDesiredPrimaryImageSize(std::experimental::make_observer(pImage));
+  SetScrollbars(
+    1,
+    1,
+    displayImage.GetWidth(),
+    displayImage.GetHeight(),
+    mViewStart.x,
+    mViewStart.y);
 
-  return displayImage.Rescale(size.GetWidth(), size.GetHeight(), wxIMAGE_QUALITY_NEAREST);
+  auto size = GetDesiredPrimaryImageSize(pImage);
+
+  return displayImage.Rescale(
+    size.GetWidth(),
+    size.GetHeight(),
+    wxIMAGE_QUALITY_NEAREST);
 }
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-wxSize PictureInPictureWindow::GetThumbnailSize() const
+wxSize PictureInPictureWindow::DoGetThumbnailSize() const
 {
-  auto pSecondaryImage = &mImage1;
+  auto pSecondaryImage = std::experimental::make_observer(mpImage1.get());
 
   if (!mIsPrimaryDisplayBitmap1)
   {
-    pSecondaryImage = &mImage2;
+    pSecondaryImage = std::experimental::make_observer(mpImage2.get());
+  }
+
+  if (!pSecondaryImage)
+  {
+    return wxSize();
   }
 
   auto width = mThumbnailWidth;
@@ -183,15 +211,20 @@ wxSize PictureInPictureWindow::GetThumbnailSize() const
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-wxImage PictureInPictureWindow::GenerateThumbnail(
+wxImage PictureInPictureWindow::DoGenerateThumbnail(
   const std::optional<wxRect> portionOfTheImageToThumbnail) const
 {
-  auto desiredSize = GetThumbnailSize();
-  auto pSecondaryImage = &mImage2;
+  auto desiredSize = DoGetThumbnailSize();
+  auto pSecondaryImage = std::experimental::make_observer(mpImage2.get());
 
   if (!mIsPrimaryDisplayBitmap1)
   {
-    pSecondaryImage = &mImage1;
+    pSecondaryImage = std::experimental::make_observer(mpImage1.get());
+  }
+
+  if (!pSecondaryImage)
+  {
+    return wxImage();
   }
 
   wxImage originalWxImage(
@@ -208,7 +241,6 @@ wxImage PictureInPictureWindow::GenerateThumbnail(
   {
     auto subImageSize = portionOfTheImageToThumbnail->GetSize();
 
-
     if (
       subImageSize.GetWidth() < originalSize.GetWidth() &&
       subImageSize.GetHeight() < originalSize.GetHeight())
@@ -224,24 +256,19 @@ wxImage PictureInPictureWindow::GenerateThumbnail(
   {
     image = originalWxImage;
   }
-  auto scaleFactor =
-    static_cast<double>(desiredSize.GetWidth()) / image.GetWidth();
-
-  image.Rescale(desiredSize.GetWidth(), image.GetHeight() * scaleFactor);
-
   if (image.GetHeight() < desiredSize.GetHeight())
   {
     desiredSize.SetHeight(image.GetHeight());
   }
 
-  return image.Resize(desiredSize, wxPoint(0, 0));
+  return image.Rescale(desiredSize.x, desiredSize.y, wxIMAGE_QUALITY_NEAREST);
 }
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 void PictureInPictureWindow::OnLeftClickDown(wxMouseEvent& event)
 {
-  if (!IsClickInMiniWindow(event.GetPosition()))
+  if (!DoIsClickInMiniWindow(event.GetPosition()))
   {
     mViewStart = GetViewStart();
 
@@ -257,18 +284,18 @@ void PictureInPictureWindow::OnLeftClickDown(wxMouseEvent& event)
 //------------------------------------------------------------------------------
 void PictureInPictureWindow::OnLeftClickDoubleClick(wxMouseEvent& event)
 {
-  if (IsClickInMiniWindow(event.GetPosition()))
+  if (DoIsClickInMiniWindow(event.GetPosition()))
   {
     auto viewStart = GetViewStart();
 
     {
-      std::lock_guard lock(mBitmapMutex);
+      std::lock_guard lock(mImageMutex);
 
       mIsPrimaryDisplayBitmap1 = !mIsPrimaryDisplayBitmap1;
 
-      mThumbnail = GenerateThumbnail();
+      mThumbnail = DoGenerateThumbnail();
 
-      mPrimaryBitmap = GeneratePrimaryImage();
+      mPrimaryBitmap = DoGeneratePrimaryImage();
     }
 
     Scroll(mSecondaryViewStart);
@@ -281,9 +308,9 @@ void PictureInPictureWindow::OnLeftClickDoubleClick(wxMouseEvent& event)
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-bool PictureInPictureWindow::IsClickInMiniWindow(const wxPoint& point)
+bool PictureInPictureWindow::DoIsClickInMiniWindow(const wxPoint& point)
 {
- auto location = GetMiniWindowLocation() - GetViewStart();
+ auto location = DoGetMiniWindowLocation() - GetViewStart();
 
  if (
    static_cast<int>(point.x) > location.x &&
@@ -295,9 +322,6 @@ bool PictureInPictureWindow::IsClickInMiniWindow(const wxPoint& point)
  }
  return false;
 }
-
-//------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -347,46 +371,34 @@ void PictureInPictureWindow::PanPrimaryImage(const wxPoint& position)
 
   Scroll(mViewStart + scrollDistance);
 
+  mViewStart = GetViewStart();
+
   Refresh();
 }
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-void PictureInPictureWindow::SetImage1(const dl::image::Image& image)
+void PictureInPictureWindow::SetImage1(
+  const std::shared_ptr<const dl::image::Image>& pImage)
 {
   {
     std::lock_guard Lock(mImageMutex);
 
-    mImage1 = image;
+    mpImage1 = pImage;
   }
 
-  std::optional<wxImage> primaryImage, thumbnail;
-
+  gs::DoOnGuiThread(
+    [this]
   {
-    std::lock_guard Lock(mBitmapMutex);
+    std::lock_guard lock(mImageMutex);
 
     if (mIsPrimaryDisplayBitmap1)
     {
-      primaryImage = GeneratePrimaryImage();
+      mPrimaryBitmap = DoGeneratePrimaryImage();
     }
     else
     {
-      thumbnail = GenerateThumbnail();
-    }
-  }
-
-  gs::DoOnGuiThread(
-    [this, primaryImage = std::move(primaryImage), thumbnail = std::move(thumbnail)]
-  {
-    std::lock_guard Lock(mBitmapMutex);
-
-    if (primaryImage)
-    {
-      mPrimaryBitmap = *primaryImage;
-    }
-    else
-    {
-      mThumbnail = *thumbnail;
+      mThumbnail = DoGenerateThumbnail();;
     }
 
     Refresh();
@@ -395,127 +407,26 @@ void PictureInPictureWindow::SetImage1(const dl::image::Image& image)
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-void PictureInPictureWindow::SetImage2(const dl::image::Image& image)
+void PictureInPictureWindow::SetImage2(
+  const std::shared_ptr<const dl::image::Image>& pImage)
 {
   {
     std::lock_guard Lock(mImageMutex);
 
-    mImage2 = image;
+    mpImage2 = pImage;
   }
 
-  std::optional<wxImage> primaryImage, thumbnail;
-
+  gs::DoOnGuiThread([this]
   {
-    std::lock_guard Lock(mBitmapMutex);
+    std::lock_guard Lock(mImageMutex);
 
     if (!mIsPrimaryDisplayBitmap1)
     {
-      primaryImage = GeneratePrimaryImage();
+      mPrimaryBitmap = DoGeneratePrimaryImage();
     }
     else
     {
-      thumbnail = GenerateThumbnail();
-    }
-  }
-
-  gs::DoOnGuiThread(
-    [this, primaryImage = std::move(primaryImage), thumbnail = std::move(thumbnail)]
-  {
-    std::lock_guard Lock(mBitmapMutex);
-
-    if (primaryImage)
-    {
-      mPrimaryBitmap = *primaryImage;
-    }
-    else
-    {
-      mThumbnail = *thumbnail;
-    }
-
-    Refresh();
-  });
-}
-
-//------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
-void PictureInPictureWindow::SetImage1(dl::image::Image&& image)
-{
-  {
-    std::lock_guard Lock(mImageMutex);
-
-    mImage1 = std::move(image);
-  }
-
-  std::optional<wxImage> primaryImage, thumbnail;
-
-  {
-    std::lock_guard Lock(mBitmapMutex);
-
-    if (mIsPrimaryDisplayBitmap1)
-    {
-      primaryImage = GeneratePrimaryImage();
-    }
-    else
-    {
-      thumbnail = GenerateThumbnail();
-    }
-  }
-
-  gs::DoOnGuiThread(
-    [this, primaryImage = std::move(primaryImage), thumbnail = std::move(thumbnail)]
-  {
-    std::lock_guard Lock(mBitmapMutex);
-
-    if (primaryImage)
-    {
-      mPrimaryBitmap = *primaryImage;
-    }
-    else
-    {
-      mThumbnail = *thumbnail;
-    }
-
-    Refresh();
-  });
-}
-
-//------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
-void PictureInPictureWindow::SetImage2(dl::image::Image&& image)
-{
-  {
-    std::lock_guard Lock(mImageMutex);
-
-    mImage2 = std::move(image);
-  }
-
-  std::optional<wxImage> primaryImage, thumbnail;
-
-  {
-    std::lock_guard Lock(mBitmapMutex);
-
-    if (!mIsPrimaryDisplayBitmap1)
-    {
-      primaryImage = GeneratePrimaryImage();
-    }
-    else
-    {
-      thumbnail = GenerateThumbnail();
-    }
-  }
-
-  gs::DoOnGuiThread(
-    [this, primaryImage = std::move(primaryImage), thumbnail = std::move(thumbnail)]
-  {
-    std::lock_guard Lock(mBitmapMutex);
-
-    if (primaryImage)
-    {
-      mPrimaryBitmap = *primaryImage;
-    }
-    else
-    {
-      mThumbnail = *thumbnail;
+      mThumbnail = DoGenerateThumbnail();;
     }
 
     Refresh();
