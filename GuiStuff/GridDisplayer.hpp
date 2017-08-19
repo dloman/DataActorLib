@@ -234,7 +234,7 @@ namespace gs
       void Set(T t)
       {
         static_assert(
-          dl::ContainsType<T>(std::tuple<Args...> {}),
+          dl::ContainsType<T, std::tuple<Args...>> {},
           "Set must be called with contained type");
 
         gs::DoOnGuiThread([t, this] { AddGridValues(GetGrid<T>(), t); });
